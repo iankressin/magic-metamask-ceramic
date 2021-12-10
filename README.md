@@ -1,34 +1,151 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# (Magic || MetaMask) + Ceramic 
 
-## Getting Started
+This is a sample repo on how to integrate Magic Link, MetaMask as authentication methods for Ceramic in order to perform write operations on documents. The goal is to integrate all the moving parts and allow users to edit the information of their `basicProfile` schema.
 
-First, run the development server:
+## Installation
 
-```bash
-npm run dev
-# or
-yarn dev
+For this integration we will need the following packages:
+```
+npm i --save \
+@3id/connect \
+@ceramicnetwork/3id-did-resolver \
+@ceramicnetwork/http-client \
+@glazed/datamodel \
+@glazed/did-datastore \
+dids \
+magic-sdk
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Magic's API key
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+### Ceramic authentication
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+You will also need the publishable API keys from your project, which you can get at Magic's [dashboard](https://dashboard.magic.link)
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## Code
 
-## Learn More
+First things first, we need to create a Ceramic instce and set the [DID resolver](https://developers.ceramic.network/authentication/3id-did/resolver/) 
 
-To learn more about Next.js, take a look at the following resources:
+```js
+const ceramic = new Ceramic(process.env.NEXT_PUBLIC_CERAMIC_NODE_URL);
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+const resolver = {
+  ...ThreeIdResolver.getResolver(ceramic)
+};
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+const did = new DID({ resolver });
+ceramic.did = did;
+```
 
-## Deploy on Vercel
+We also want to create an instance of `ThreeIdConnect`, which provides [3ID account management in a iframe](https://github.com/ceramicstudio/3id-connect)
+```
+const threeIdConnect = new ThreeIdConnect()
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Now we need to set the DID provider to newly created `threeIdConnect` instance, which is responsible signing messages in order to create a [Ceramic flavoured DID (3ID)](https://github.com/ceramicnetwork/js-ceramic/blob/90973ee32352e260cb040e687720095b145b4702/docs-src/guides/add-new-blockchain.md#overview-ceramic-and-blockchain-accounts).
+In order to create the DID provider, we will need an instance of a blockchain authentication provider, in this example we are going to use `EthereumAuthProvider`, for the Ethereum network.
+Let's create a function that will receive a Ethereum provider and user's wallet address and use it to create the DID provider and using it as Ceramic's DID provider.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```js
+export async function setProvider(walletAddress, provider) {
+  const ethereumProvider = provider ? provider : window.ethereum;
+
+  const authProvider = new EthereumAuthProvider(
+    ethereumProvider,
+    walletAddress
+  );
+
+  await threeIdConnect.connect(authProvider);
+  const didProvider = await threeIdConnect.getDidProvider();
+
+  if (!ceramic || !ceramic.did) {
+    console.error("Ceramic instance or DID has not been configured.");
+    return;
+  }
+
+  ceramic.did.setProvider(didProvider);
+}
+```
+
+By default our function will use MetaMask Ethereum provider available on the window object, as long as MetaMask extension is installed.
+
+After we have our provider in place, we need to authenticate Ceramic using the 3ID iframe
+
+```js
+export function authenticateCeramic() {
+  return ceramic.did.authenticate();
+}
+```
+
+[Full code](https://github.com/iankressin/magic-ceramic/blob/main/lib/ceramic.js)
+
+
+### Magic || MetaMask
+The next step is to create the method that will act as a hub for authentication, which will receive the desired authentication method, either `metamask` or `magic` and will handle each of these cases by setting different providers to our ceramic object.
+
+```js
+export async function signIn({ method, email }) {
+  if (isCeramicAuthenticated()) return ceramic.did.id;
+
+  if (method === "magicLink") await magicSignIn(email);
+  else if (method === "metamask") await metamaskSignIn();
+  else throw Error("Invalid authentication method");
+
+  return await authenticateCeramic();
+}
+```
+
+The first line of this function, we check if Ceramic is already authenticated, if it is we will return the ceramic.did.id
+And after 
+
+#### Magic
+Now we need to handle both authentication methods. Let's start with `magic`.
+
+```js
+async function magicSignIn(email) {
+  const magic = new Magic('API_KEY');
+
+  await magic.auth.loginWithMagicLink({
+    email
+  });
+
+  const meta = await magic.user.getMetadata();
+
+  await setProvider(meta.publicAddress, magic.rpcProvider);
+}
+```
+
+Here we create a new instance of Magic's class, passing the API key the we got from Magic's dashboard.
+Next we call the `magic.auth.loginWithMagicLink` that will send users an email to confirm the sign in and automatically creates an account in case of this is the first sign in.
+The promise is fulfilled when the user clicks the link in their email. After that we will have access to the `meta` object, which provides an Ethereum public address for each account.
+The last piece missing to integrate Magic and Ceramic is an Ethereum provider, that luckily enough is provided by the magic instance and can be accessed by `magic.rpcProvider`
+
+
+#### MetaMaks
+
+For MetaMask, the method is fairly simple since we are already using the `window.ethereum` as our default provider, we just need to request the wallet address to the extension and pass it to the `setProvider` function.
+
+```js
+async function metamaskSignIn() {
+  const addresses = await getWalletAddress();
+
+  await setProvider(addresses[0]);
+}
+```
+
+The wallet address can be request by
+
+```js
+export async function getWalletAddress() {
+  try {
+    return await window.ethereum.enable();
+  } catch (err) {
+    console.log("MetaMask not installed");
+  }
+}
+```
+
+[Full code](https://github.com/iankressin/magic-ceramic/blob/main/lib/auth.js)
+
+Now we can call our `signIn` function to authenticate users using either Magic and Metamask!
+

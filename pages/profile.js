@@ -37,7 +37,7 @@ export default function Profile() {
 
   useEffect(() => fetchProfile(), [fetchProfile]);
 
-  if (loading) return <h1>Loading</h1>;
+  if (loading || !networkProfile) return <h1>Loading</h1>;
 
   return (
     <div className="flex">
@@ -138,6 +138,8 @@ function Editor({
 }
 
 function Viewer({ profile }) {
+  console.log("Profile: ", profile);
+
   return (
     <div>
       {Object.values(profile).map((value, index) => (
