@@ -2,6 +2,8 @@
 
 This is a sample repo on how to integrate Magic Link, MetaMask as authentication methods for Ceramic in order to perform write operations on documents. The goal is to integrate all the moving parts and allow users to edit the information of their `basicProfile` schema.
 
+Live at https://magic-metamask-ceramic.vercel.app/
+
 ## Installation
 
 For this integration we will need the following packages:
