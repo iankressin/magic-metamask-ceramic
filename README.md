@@ -12,6 +12,7 @@ For this integration we will need the following packages:
 npm i --save \
 @3id/connect \
 @ceramicnetwork/3id-did-resolver \
+key-did-resolver \
 @ceramicnetwork/http-client \
 @glazed/datamodel \
 @glazed/did-datastore \
@@ -27,13 +28,14 @@ You will also need the publishable API keys from your project, which you can get
 
 ## Code
 
-First things first, we need to create a Ceramic instance
+First things first, we need to create a Ceramic
 
 ```js
 const ceramic = new Ceramic(process.env.NEXT_PUBLIC_CERAMIC_NODE_URL);
 
 const resolver = {
-  ...ThreeIdResolver.getResolver(ceramic)
+  ...ThreeIdResolver.getResolver(ceramic),
+  ...KeyDidResolver.getResolver()
 };
 
 const did = new DID({ resolver });

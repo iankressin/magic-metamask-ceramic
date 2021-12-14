@@ -14,6 +14,7 @@
     "@glazed/datamodel": "^0.2.0",
     "@glazed/did-datastore": "^0.2.1",
     "dids": "^2.4.3",
+    "key-did-resolver": "^1.4.0",
     "magic-sdk": "^6.2.1",
     "next": "12.0.4",
     "react": "17.0.2",
