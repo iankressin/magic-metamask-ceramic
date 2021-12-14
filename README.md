@@ -1,4 +1,4 @@
-# (Magic || MetaMask) + Ceramic 
+# (Magic || MetaMask) + Ceramic
 
 This is a sample repo on how to integrate Magic Link, MetaMask as authentication methods for Ceramic in order to perform write operations on documents. The goal is to integrate all the moving parts and allow users to edit the information of their `basicProfile` schema.
 
@@ -7,6 +7,7 @@ Live at https://magic-metamask-ceramic.vercel.app/
 ## Installation
 
 For this integration we will need the following packages:
+
 ```
 npm i --save \
 @3id/connect \
@@ -26,7 +27,7 @@ You will also need the publishable API keys from your project, which you can get
 
 ## Code
 
-First things first, we need to create a Ceramic instce and set the [DID resolver](https://developers.ceramic.network/authentication/3id-did/resolver/) 
+First things first, we need to create a Ceramic instance
 
 ```js
 const ceramic = new Ceramic(process.env.NEXT_PUBLIC_CERAMIC_NODE_URL);
@@ -40,18 +41,20 @@ ceramic.did = did;
 ```
 
 We also want to create an instance of `ThreeIdConnect`, which provides [3ID account management in a iframe](https://github.com/ceramicstudio/3id-connect)
-```
-const threeIdConnect = new ThreeIdConnect()
+
+```js
+const threeIdConnect = new ThreeIdConnect();
 ```
 
 Now we need to set the DID provider to newly created `threeIdConnect` instance, which is responsible signing messages in order to create a [Ceramic flavoured DID (3ID)](https://github.com/ceramicnetwork/js-ceramic/blob/90973ee32352e260cb040e687720095b145b4702/docs-src/guides/add-new-blockchain.md#overview-ceramic-and-blockchain-accounts).
 In order to create the DID provider, we will need an instance of a blockchain authentication provider, in this example we are going to use `EthereumAuthProvider`, for the Ethereum network.
 Let's create a function that will receive a Ethereum provider and user's wallet address and use it to create the DID provider and using it as Ceramic's DID provider.
+Finally, we can creat a new instance of DID set it to `ceramic.did`
 
 ```js
 export async function setProvider(walletAddress, provider) {
+  const threeIdConnect = new ThreeIdConnect();
   const ethereumProvider = provider ? provider : window.ethereum;
-
   const authProvider = new EthereumAuthProvider(
     ethereumProvider,
     walletAddress
@@ -60,12 +63,8 @@ export async function setProvider(walletAddress, provider) {
   await threeIdConnect.connect(authProvider);
   const didProvider = await threeIdConnect.getDidProvider();
 
-  if (!ceramic || !ceramic.did) {
-    console.error("Ceramic instance or DID has not been configured.");
-    return;
-  }
-
-  ceramic.did.setProvider(didProvider);
+  const did = new DID({ resolver, provider: didProvider });
+  ceramic.did = did;
 }
 ```
 
@@ -81,8 +80,8 @@ export function authenticateCeramic() {
 
 [Full code](https://github.com/iankressin/magic-ceramic/blob/main/lib/ceramic.js)
 
-
 ### Magic || MetaMask
+
 The next step is to create the method that will act as a hub for authentication, which will receive the desired authentication method, either `metamask` or `magic` and will handle each of these cases by setting different providers to our ceramic object.
 
 ```js
@@ -98,14 +97,15 @@ export async function signIn({ method, email }) {
 ```
 
 The first line of this function, we check if Ceramic is already authenticated, if it is we will return the ceramic.did.id
-And after 
+And after
 
 #### Magic
+
 Now we need to handle both authentication methods. Let's start with `magic`.
 
 ```js
 async function magicSignIn(email) {
-  const magic = new Magic('API_KEY');
+  const magic = new Magic("API_KEY");
 
   await magic.auth.loginWithMagicLink({
     email
@@ -122,8 +122,7 @@ Next we call the `magic.auth.loginWithMagicLink` that will send users an email t
 The promise is fulfilled when the user clicks the link in their email. After that we will have access to the `meta` object, which provides an Ethereum public address for each account.
 The last piece missing to integrate Magic and Ceramic is an Ethereum provider, that luckily enough is provided by the magic instance and can be accessed by `magic.rpcProvider`
 
-
-#### MetaMaks
+#### MetaMask
 
 For MetaMask, the method is fairly simple since we are already using the `window.ethereum` as our default provider, we just need to request the wallet address to the extension and pass it to the `setProvider` function.
 
@@ -150,4 +149,3 @@ export async function getWalletAddress() {
 [Full code](https://github.com/iankressin/magic-ceramic/blob/main/lib/auth.js)
 
 Now we can call our `signIn` function to authenticate users using either Magic and Metamask!
-
