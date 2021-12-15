@@ -28,7 +28,8 @@ You will also need the publishable API keys from your project, which you can get
 
 ## Code
 
-First things first, we need to create a Ceramic
+First things first, we need to create a Ceramic instance and a resolver object.
+On Ceramic network, most of the times streams are signed with `3id`. Although, `key-did` could be appear out there in a few documents, so we create our resolver with both `key-did` and `3id` resolvers.
 
 ```js
 const ceramic = new Ceramic(process.env.NEXT_PUBLIC_CERAMIC_NODE_URL);
@@ -37,9 +38,6 @@ const resolver = {
   ...ThreeIdResolver.getResolver(ceramic),
   ...KeyDidResolver.getResolver()
 };
-
-const did = new DID({ resolver });
-ceramic.did = did;
 ```
 
 We also want to create an instance of `ThreeIdConnect`, which provides [3ID account management in a iframe](https://github.com/ceramicstudio/3id-connect)
