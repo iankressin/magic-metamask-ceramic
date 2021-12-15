@@ -147,4 +147,4 @@ export async function getWalletAddress() {
 
 [Full code](https://github.com/iankressin/magic-ceramic/blob/main/lib/auth.js)
 
-Now we can call our `signIn` function to authenticate users using either Magic and Metamask!
+Now we can call our `signIn` function to authenticate users using either Magic or Metamask!
