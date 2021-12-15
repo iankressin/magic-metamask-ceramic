@@ -98,12 +98,11 @@ export async function signIn({ method, email }) {
 }
 ```
 
-The first line of this function, we check if Ceramic is already authenticated, if it is we will return the ceramic.did.id
-And after
+The first line of this function, we check if Ceramic is already authenticated, if it is we will return the ceramic.did.id. After, we check what is the authentication method picked by the user, and follow the respective execution path.
 
 #### Magic
 
-Now we need to handle both authentication methods. Let's start with `magic`.
+We need now to handle both authentication methods. Let's start with `magic`.
 
 ```js
 async function magicSignIn(email) {
